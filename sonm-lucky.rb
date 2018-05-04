@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 
+require 'base64'
 require 'optparse'
 require 'tempfile'
 require 'yaml'
@@ -64,12 +65,40 @@ class Lucky
     bid_order_id = create_bid_order
     deal_id = open_deal ask_order_id, bid_order_id
     check_deal_status deal_id
+    sleep 10
     task_id = start_task deal_id
     task_status deal_id, task_id
     task_stop deal_id, task_id
   end
 
+  def close_all_deals()
+    deals.each do |deal|
+      close_deal deal['id']
+    end
+  end
+
+  def close_deal(deal_id)
+    run_cmd do
+      %x[#{@cli} deals finish #{deal_id}]
+    end
+  end
+
   private
+
+  def deals
+    output = run_cmd do
+      %x[#{@cli} deals list --out=json]
+    end
+
+    output = JSON.parse output
+    output['deals'].each do |deal|
+      ['consumerID', 'supplierID', 'masterID'].each do |id|
+        deal[id]['address'] = '0x' + Base64.decode64(deal[id]['address']).unpack('H*').join
+      end
+    end
+
+    output['deals']
+  end
 
   def check_worker_running
     run 'Checking Worker is running' do
