@@ -1,0 +1,5 @@
+task:
+  container:
+    commit_on_stop: true
+    name: 'httpd:latest'
+    

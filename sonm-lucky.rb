@@ -6,6 +6,7 @@ require 'tempfile'
 require 'yaml'
 require 'json'
 require 'rbconfig'
+require 'set'
 
 def run_cmd(&block)
   output = yield block
@@ -59,6 +60,8 @@ class Lucky
   end
 
   def start
+    # close_all_deals
+
     check_worker_running
     ask_plan_id = create_ask_plan
     ask_order_id = get_order_id ask_plan_id
@@ -91,13 +94,9 @@ class Lucky
     end
 
     output = JSON.parse output
-    output['deals'].each do |deal|
-      ['consumerID', 'supplierID', 'masterID'].each do |id|
-        deal[id]['address'] = '0x' + Base64.decode64(deal[id]['address']).unpack('H*').join
-      end
+    output['deals'].uniq do |deal|
+      deal['id']
     end
-
-    output['deals']
   end
 
   def check_worker_running
@@ -111,7 +110,7 @@ class Lucky
   def create_ask_plan
     template = {
       duration: '1h',
-      price: '1000 SNM/h',
+      price: '1 SNM/h',
       resources: {
         cpu: {
           cores: 0.01,
@@ -173,7 +172,7 @@ class Lucky
   def create_bid_order
     template = {
       duration: '1h',
-      price: '1000 SNM/h',
+      price: '1 SNM/h',
       resources: {
         network: {
           overlay: true,
@@ -238,15 +237,7 @@ class Lucky
   end
 
   def start_task(deal_id)
-    template = {
-      task: {
-        container: {
-          commit_on_stop: true,
-          name: 'httpd:latest',
-          env: {},
-        },
-      },
-    }
+    template = YAML.load_file 'tasks/httpd.yaml'
 
     run 'Start task' do
       file = Tempfile.new('task.yaml')
@@ -276,10 +267,8 @@ class Lucky
 
   def task_status(deal_id, task_id)
     run 'Task status' do
-      worker_id = worker_id_by_deal_id deal_id
-
       run_cmd do
-        %x[#{@cli} tasks status #{worker_id} #{task_id}]
+        %x[#{@cli} tasks status #{deal_id} #{task_id}]
       end
 
       'OK'
@@ -288,10 +277,8 @@ class Lucky
 
   def task_stop(deal_id, task_id)
     run 'Task stop' do
-      worker_id = worker_id_by_deal_id deal_id
-
       run_cmd do
-        %x[#{@cli} tasks stop #{worker_id} #{task_id}]
+        %x[#{@cli} tasks stop #{deal_id} #{task_id}]
       end
 
       'OK'
