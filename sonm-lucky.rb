@@ -64,9 +64,10 @@ class Lucky
 
     check_worker_running
     ask_plan_id = create_ask_plan
-    ask_order_id = get_order_id ask_plan_id
-    bid_order_id = create_bid_order
-    deal_id = open_deal ask_order_id, bid_order_id
+    get_order_id ask_plan_id
+    create_bid_order
+    # deal_id = open_deal ask_order_id, bid_order_id
+    deal_id = get_deal_id_from_ask_plan ask_plan_id
     check_deal_status deal_id
     sleep 10
     task_id = start_task deal_id
@@ -159,6 +160,26 @@ class Lucky
 
         content = YAML.load output
         order_id = content[ask_plan_id]['orderid']
+        if order_id != nil && order_id != ''
+          break
+        end
+        sleep 1.0
+      end
+
+      order_id
+    end
+  end
+
+  def get_deal_id_from_ask_plan(ask_plan_id)
+    run 'Obtain deal ID' do
+      order_id = nil
+      loop do
+        output = run_cmd do
+          %x[#{@cli} worker ask-plan list]
+        end
+
+        content = YAML.load output
+        order_id = content[ask_plan_id]['dealid']
         if order_id != nil && order_id != ''
           break
         end
